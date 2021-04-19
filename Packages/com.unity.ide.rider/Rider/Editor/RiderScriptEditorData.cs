@@ -16,6 +16,7 @@ namespace Packages.Rider.Editor
     [SerializeField] internal SerializableVersion prevEditorBuildNumber;
     [SerializeField] internal RiderPathLocator.ProductInfo productInfo;
     [SerializeField] internal string[] activeScriptCompilationDefines;
+    [SerializeField] internal bool playerSettingsAllowUnsafeCode;
 
     public void Init()
     {
@@ -25,17 +26,19 @@ namespace Packages.Rider.Editor
       }
     }
 
-    public void InvalidateSavedCompilationDefines()
+    public void InvalidateCompilationSettings()
     {
       activeScriptCompilationDefines = EditorUserBuildSettings.activeScriptCompilationDefines;
+      playerSettingsAllowUnsafeCode = PlayerSettings.allowUnsafeCode;
     }
     
-    public bool HasChangesInCompilationDefines()
+    public bool HasChangesInCompilationSettings()
     {
       if (activeScriptCompilationDefines == null)
         return false;
-      
-      return !EditorUserBuildSettings.activeScriptCompilationDefines.SequenceEqual(activeScriptCompilationDefines);
+
+      return playerSettingsAllowUnsafeCode != PlayerSettings.allowUnsafeCode 
+             || !EditorUserBuildSettings.activeScriptCompilationDefines.SequenceEqual(activeScriptCompilationDefines);
     }
 
     public void Invalidate(string editorInstallationPath, bool shouldInvalidatePrevEditorBuildNumber = false)

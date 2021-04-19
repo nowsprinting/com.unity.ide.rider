@@ -109,15 +109,20 @@ namespace Packages.Rider.Editor.ProjectGeneration
     {
       SetupSupportedExtensions();
 
-      if (HasFilesBeenModified(affectedFiles, reimportedFiles) || RiderScriptEditorData.instance.hasChanges || RiderScriptEditorData.instance.HasChangesInCompilationDefines())
+      // delay so `EditorUserBuildSettings.activeScriptCompilationDefines` and `PlayerSettings.allowUnsafeCode` new values are propagated
+      EditorApplication.delayCall += () => SyncIfNeededCore(affectedFiles, reimportedFiles);
+      return true; // required by IGenerator interface
+    }
+
+    private void SyncIfNeededCore(IEnumerable<string> affectedFiles, IEnumerable<string> reimportedFiles)
+    {
+      if (HasFilesBeenModified(affectedFiles, reimportedFiles) || RiderScriptEditorData.instance.hasChanges ||
+          RiderScriptEditorData.instance.HasChangesInCompilationSettings())
       {
         Sync();
         RiderScriptEditorData.instance.hasChanges = false;
-        RiderScriptEditorData.instance.InvalidateSavedCompilationDefines();
-        return true;
+        RiderScriptEditorData.instance.InvalidateCompilationSettings();
       }
-
-      return false;
     }
 
     private bool HasFilesBeenModified(IEnumerable<string> affectedFiles, IEnumerable<string> reimportedFiles)
@@ -209,7 +214,7 @@ namespace Packages.Rider.Editor.ProjectGeneration
             new Assembly[0],
             riderAssembly.compiledAssemblyReferences.Where(a =>
               a.EndsWith("UnityEditor.dll") || a.EndsWith("UnityEngine.dll") ||
-              a.EndsWith("UnityEngine.CoreModule.dll")).ToArray(), riderAssembly.flags);
+              a.EndsWith("UnityEngine.CoreModule.dll")).ToArray(), riderAssembly.flags, riderAssembly.compilerOptions);
         return new ProjectPart(allAssetProjectPart.Key, assembly, allAssetProjectPart.Value);
       }));
 
@@ -496,7 +501,7 @@ namespace Packages.Rider.Editor.ProjectGeneration
         k_TargetFrameworkVersion,
         GenerateLangVersion(otherResponseFilesData["langversion"], assembly),
         k_BaseDirectory,
-        assembly.CompilerOptions.AllowUnsafeCode | responseFilesData.Any(x => x.Unsafe),
+        GetAllowUnsafeCode(assembly, responseFilesData),
         GenerateNoWarn(otherResponseFilesData["nowarn"].ToList()),
         GenerateAnalyserItemGroup(
           otherResponseFilesData["analyzer"].Concat(otherResponseFilesData["a"])
@@ -526,6 +531,11 @@ namespace Packages.Rider.Editor.ProjectGeneration
           "Failed creating c# project because the c# project header did not have the correct amount of arguments, which is " +
           arguments.Length);
       }
+    }
+
+    private static bool GetAllowUnsafeCode(ProjectPart assembly, List<ResponseFileData> responseFilesData)
+    {
+      return assembly.CompilerOptions.AllowUnsafeCode | responseFilesData.Any(x => x.Unsafe);
     }
 
     private string GenerateNullable(IEnumerable<string> enumerable)
